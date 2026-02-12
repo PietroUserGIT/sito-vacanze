@@ -1,0 +1,43 @@
+{
+    "navbar": {
+        "home": "Home",
+        "apartments": "Appartamenti",
+        "contact": "Contatti",
+        "bookNow": "Prenota Ora"
+    },
+    "hero": {
+        "title1": "Il tuo angolo di paradiso",
+        "title2": "nel cuore della natura.",
+        "subtitle": "Appartamenti eleganti, silenziosi e dotati di ogni comfort per una vacanza indimenticabile. Scopri le nostre proposte e prenota il tuo soggiorno.",
+        "cta": "Esplora gli Appartamenti"
+    },
+    "home": {
+        "title": "Le Nostre Dimore",
+        "priceFrom": "Da €{price} / notte",
+        "book": "Prenota",
+        "noProperties": "Nessun appartamento disponibile al momento."
+    },
+    "footer": {
+        "tagline": "La tua fuga perfetta tra mare e natura. Esperienze uniche e soggiorni indimenticabili.",
+        "quickLinks": "Link Rapidi",
+        "contactUs": "Contattaci",
+        "rights": "Tutti i diritti riservati."
+    },
+    "booking": {
+        "title": "Prenota il Tuo Soggiorno",
+        "checkIn": "Check-in",
+        "checkOut": "Check-out",
+        "selectApartment": "Seleziona Appartamento",
+        "chooseOption": "Scegli un'opzione...",
+        "guests": "Numero di Ospiti",
+        "personalData": "I Tuoi Dati",
+        "fullName": "Nome Completo",
+        "email": "Email",
+        "submit": "Verifica Disponibilità e Prenota",
+        "submitting": "Salvataggio in corso...",
+        "stripeNote": "Verrai reindirizzato a Stripe per completare il pagamento in totale sicurezza.",
+        "loading": "Caricamento...",
+        "success": "Prenota effettuata con successo!",
+        "error": "Errore durante la prenotazione: "
+    }
+}

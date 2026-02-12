@@ -1,0 +1,43 @@
+{
+    "navbar": {
+        "home": "Startseite",
+        "apartments": "Apartments",
+        "contact": "Kontakt",
+        "bookNow": "Jetzt Buchen"
+    },
+    "hero": {
+        "title1": "Ihr Stück Paradies",
+        "title2": "im Herzen della Natur.",
+        "subtitle": "Elegante, ruhige Apartments mit allem Komfort für unvergessliche Ferien. Entdecken Sie unsere Vorschläge und buchen Sie Ihren Aufenthalt.",
+        "cta": "Apartments Erkunden"
+    },
+    "home": {
+        "title": "Unsere Häuser",
+        "priceFrom": "Ab €{price} / Nacht",
+        "book": "Buchen",
+        "noProperties": "Zur Zeit sind keine Apartments verfügbar."
+    },
+    "footer": {
+        "tagline": "Ihre perfekte Auszeit zwischen Meer und Natur. Einzigartige Erlebnisse und unvergessliche Aufenthalte.",
+        "quickLinks": "Quick Links",
+        "contactUs": "Kontaktieren Sie uns",
+        "rights": "Alle Rechte vorbehalten."
+    },
+    "booking": {
+        "title": "Buchen Sie Ihren Aufenthalt",
+        "checkIn": "Anreise",
+        "checkOut": "Abreise",
+        "selectApartment": "Apartment Auswählen",
+        "chooseOption": "Wählen Sie eine Option...",
+        "guests": "Anzahl der Gäste",
+        "personalData": "Ihre Daten",
+        "fullName": "Vollständiger Name",
+        "email": "E-Mail",
+        "submit": "Verfügbarkeit Prüfen und Buchen",
+        "submitting": "Speichern...",
+        "stripeNote": "Sie werden zu Stripe weitergeleitet, um die Zahlung sicher abzuschließen.",
+        "loading": "Ladevorgang...",
+        "success": "Buchung erfolgreich!",
+        "error": "Fehler bei der Buchung: "
+    }
+}

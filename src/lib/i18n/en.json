@@ -1,0 +1,43 @@
+{
+    "navbar": {
+        "home": "Home",
+        "apartments": "Apartments",
+        "contact": "Contact",
+        "bookNow": "Book Now"
+    },
+    "hero": {
+        "title1": "Your corner of paradise",
+        "title2": "in the heart of nature.",
+        "subtitle": "Elegant, quiet apartments equipped with every comfort for an unforgettable holiday. Discover our proposals and book your stay.",
+        "cta": "Explore Apartments"
+    },
+    "home": {
+        "title": "Our Homes",
+        "priceFrom": "From €{price} / night",
+        "book": "Book",
+        "noProperties": "No properties available at the moment."
+    },
+    "footer": {
+        "tagline": "Your perfect escape between sea and nature. Unique experiences and unforgettable stays.",
+        "quickLinks": "Quick Links",
+        "contactUs": "Contact Us",
+        "rights": "All rights reserved."
+    },
+    "booking": {
+        "title": "Book Your Stay",
+        "checkIn": "Check-in",
+        "checkOut": "Check-out",
+        "selectApartment": "Select Apartment",
+        "chooseOption": "Choose an option...",
+        "guests": "Number of Guests",
+        "personalData": "Your Details",
+        "fullName": "Full Name",
+        "email": "Email",
+        "submit": "Check Availability and Book",
+        "submitting": "Saving...",
+        "stripeNote": "You will be redirected to Stripe to complete the payment in total safety.",
+        "loading": "Loading...",
+        "success": "Booking successful!",
+        "error": "Error during booking: "
+    }
+}

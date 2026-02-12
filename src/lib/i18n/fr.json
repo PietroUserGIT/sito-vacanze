@@ -1,0 +1,43 @@
+{
+    "navbar": {
+        "home": "Accueil",
+        "apartments": "Appartements",
+        "contact": "Contact",
+        "bookNow": "Réserver"
+    },
+    "hero": {
+        "title1": "Votre coin de paradis",
+        "title2": "au cœur de la nature.",
+        "subtitle": "Appartements élégants, calmes et dotés de tout le confort pour des vacances inoubliables. Découvrez nos propositions et réservez votre séjour.",
+        "cta": "Explorer les Appartements"
+    },
+    "home": {
+        "title": "Nos Demeures",
+        "priceFrom": "À partir de {price} € / nuit",
+        "book": "Réserver",
+        "noProperties": "Aucun appartement disponible pour le moment."
+    },
+    "footer": {
+        "tagline": "Votre escapade parfaite entre mer et nature. Expériences uniques et séjours inoubliables.",
+        "quickLinks": "Liens Rapides",
+        "contactUs": "Contactez-nous",
+        "rights": "Tous droits réservés."
+    },
+    "booking": {
+        "title": "Réservez Votre Séjour",
+        "checkIn": "Arrivée",
+        "checkOut": "Départ",
+        "selectApartment": "Sélectionner un Appartement",
+        "chooseOption": "Choisissez une option...",
+        "guests": "Nombre de Personnes",
+        "personalData": "Vos Coordonnées",
+        "fullName": "Nom Complet",
+        "email": "E-mail",
+        "submit": "Vérifier la Disponibilité et Réserver",
+        "submitting": "Enregistrement...",
+        "stripeNote": "Vous serez redirigé vers Stripe per compléter le paiement en toute sécurité.",
+        "loading": "Chargement...",
+        "success": "Réservation réussie !",
+        "error": "Erreur lors de la réservation : "
+    }
+}
