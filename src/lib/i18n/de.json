@@ -39,5 +39,34 @@
         "loading": "Ladevorgang...",
         "success": "Buchung erfolgreich!",
         "error": "Fehler bei der Buchung: "
+    },
+    "calendar": {
+        "months": [
+            "Januar",
+            "Februar",
+            "März",
+            "April",
+            "Mai",
+            "Juni",
+            "Juli",
+            "August",
+            "September",
+            "Oktober",
+            "November",
+            "Dezember"
+        ],
+        "days": [
+            "So",
+            "Mo",
+            "Di",
+            "Mi",
+            "Do",
+            "Fr",
+            "Sa"
+        ],
+        "available": "Verfügbar",
+        "partiallyOccupied": "Teilweise Belegt",
+        "occupied": "Belegt",
+        "selectDates": "Daten im Kalender auswählen"
     }
 }

@@ -39,5 +39,34 @@
         "loading": "Chargement...",
         "success": "Réservation réussie !",
         "error": "Erreur lors de la réservation : "
+    },
+    "calendar": {
+        "months": [
+            "Janvier",
+            "Février",
+            "Mars",
+            "Avril",
+            "Mai",
+            "Juin",
+            "Juillet",
+            "Août",
+            "Septembre",
+            "Octobre",
+            "Novembre",
+            "Décembre"
+        ],
+        "days": [
+            "Dim",
+            "Lun",
+            "Mar",
+            "Mer",
+            "Jeu",
+            "Ven",
+            "Sam"
+        ],
+        "available": "Disponible",
+        "partiallyOccupied": "Partiellement Occupé",
+        "occupied": "Occupé",
+        "selectDates": "Sélectionnez les dates dans le calendrier"
     }
 }

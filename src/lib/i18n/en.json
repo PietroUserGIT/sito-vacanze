@@ -39,5 +39,34 @@
         "loading": "Loading...",
         "success": "Booking successful!",
         "error": "Error during booking: "
+    },
+    "calendar": {
+        "months": [
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December"
+        ],
+        "days": [
+            "Sun",
+            "Mon",
+            "Tue",
+            "Wed",
+            "Thu",
+            "Fri",
+            "Sat"
+        ],
+        "available": "Available",
+        "partiallyOccupied": "Partially Occupied",
+        "occupied": "Occupied",
+        "selectDates": "Select dates in the calendar"
     }
 }
