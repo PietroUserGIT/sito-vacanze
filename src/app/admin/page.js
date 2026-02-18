@@ -9,27 +9,58 @@ export default function AdminDashboard() {
         confirmed: 0,
         revenue: 0
     });
+    const [maintenanceMode, setMaintenanceMode] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [updatingMaintenance, setUpdatingMaintenance] = useState(false);
 
     useEffect(() => {
-        async function fetchStats() {
-            const { data, error } = await supabase.from('bookings').select('*');
-            if (error) {
-                console.error('Errore caricamento statistiche:', error);
-            } else {
-                const total = data.length;
-                const pending = data.filter(b => b.status === 'pending').length;
-                const confirmed = data.filter(b => b.status === 'confirmed').length;
-                const revenue = data
+        async function fetchData() {
+            setLoading(true);
+
+            // Fetch statistiche
+            const { data: bookingsData } = await supabase.from('bookings').select('*');
+            if (bookingsData) {
+                const total = bookingsData.length;
+                const pending = bookingsData.filter(b => b.status === 'pending').length;
+                const confirmed = bookingsData.filter(b => b.status === 'confirmed').length;
+                const revenue = bookingsData
                     .filter(b => b.status === 'confirmed')
                     .reduce((acc, b) => acc + parseFloat(b.total_price), 0);
 
                 setStats({ total, pending, confirmed, revenue });
             }
+
+            // Fetch stato manutenzione
+            const { data: settingData } = await supabase
+                .from('site_settings')
+                .select('value')
+                .eq('key', 'maintenance_mode')
+                .single();
+
+            if (settingData) {
+                setMaintenanceMode(settingData.value === true);
+            }
+
             setLoading(false);
         }
-        fetchStats();
+        fetchData();
     }, []);
+
+    const toggleMaintenance = async () => {
+        setUpdatingMaintenance(true);
+        const newValue = !maintenanceMode;
+
+        const { error } = await supabase
+            .from('site_settings')
+            .upsert({ key: 'maintenance_mode', value: newValue });
+
+        if (error) {
+            alert('Errore aggiornamento manutenzione: ' + error.message);
+        } else {
+            setMaintenanceMode(newValue);
+        }
+        setUpdatingMaintenance(false);
+    };
 
     const cardStyle = {
         background: 'white',
@@ -41,11 +72,45 @@ export default function AdminDashboard() {
         gap: '0.5rem'
     };
 
-    if (loading) return <div>Caricamento statistiche...</div>;
+    if (loading) return <div>Caricamento dati dashboard...</div>;
 
     return (
         <div>
-            <h1 style={{ marginBottom: 'var(--space-l)' }}>Dashboard Panoramica</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-l)' }}>
+                <h1>Dashboard Panoramica</h1>
+
+                {/* Toggle Manutenzione */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    background: maintenanceMode ? '#fee2e2' : '#ecfdf5',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '2rem',
+                    border: `1px solid ${maintenanceMode ? '#ef4444' : '#10b981'}`
+                }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: maintenanceMode ? '#b91c1c' : '#047857' }}>
+                        {maintenanceMode ? '🚨 SITO IN MANUTENZIONE' : '✅ SITO ONLINE'}
+                    </span>
+                    <button
+                        onClick={toggleMaintenance}
+                        disabled={updatingMaintenance}
+                        style={{
+                            padding: '0.4rem 1rem',
+                            borderRadius: '1rem',
+                            background: maintenanceMode ? '#ef4444' : '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem',
+                            fontWeight: 'bold',
+                            opacity: updatingMaintenance ? 0.7 : 1
+                        }}
+                    >
+                        {updatingMaintenance ? '...' : (maintenanceMode ? 'ATTIVA SITO' : 'METTI IN MANUTENZIONE')}
+                    </button>
+                </div>
+            </div>
 
             <div style={{
                 display: 'grid',

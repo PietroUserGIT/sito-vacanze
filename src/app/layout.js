@@ -1,6 +1,4 @@
 import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 
 import { LanguageProvider } from "@/context/LanguageContext";
 
@@ -14,9 +12,7 @@ export default function RootLayout({ children }) {
     <html lang="it">
       <LanguageProvider>
         <body>
-          <Navbar />
           {children}
-          <Footer />
         </body>
       </LanguageProvider>
     </html>
