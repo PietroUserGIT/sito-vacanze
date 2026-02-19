@@ -6,7 +6,6 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function proxy(request) {
     const { pathname } = request.nextUrl;
-
     // Percorsi esclusi dalla manutenzione
     if (
         pathname.startsWith('/admin') ||
@@ -25,11 +24,15 @@ export async function proxy(request) {
 
     try {
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
-        const { data: setting } = await supabase
+        const { data: setting, error } = await supabase
             .from('site_settings')
             .select('value')
             .eq('key', 'maintenance_mode')
             .single();
+
+        if (error) {
+            return NextResponse.next();
+        }
 
         // Se la manutenzione è attiva, reindirizza
         if (setting && setting.value === true) {
