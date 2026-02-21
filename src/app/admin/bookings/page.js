@@ -14,6 +14,7 @@ export default function BookingsAdmin() {
         saldo: 0,
         scadenzaSaldo: ''
     });
+    const [isGenerating, setIsGenerating] = useState(false);
 
     useEffect(() => {
         fetchBookings();
@@ -78,9 +79,10 @@ export default function BookingsAdmin() {
         setUpdatingId(null);
     };
 
-    const handleEmailGenerateAndApprove = (e) => {
+    const handleEmailGenerateAndApprove = async (e) => {
         e.preventDefault();
         const { booking } = emailModal;
+        setIsGenerating(true);
 
         // Esegui approvazione sul DB
         executeStatusUpdate(booking.id, 'approved');
@@ -92,6 +94,36 @@ export default function BookingsAdmin() {
         const scadenzaSaldoArr = new Date(emailFormData.scadenzaSaldo).toLocaleDateString();
 
         const subject = encodeURIComponent(`Approvazione Prenotazione - Vacanze Mare`);
+        // Chiamata all'API Stripe per creare la Checkout Session
+        let paymentLink = '[ERRORE GENERAZIONE LINK STRIPE]';
+        try {
+            const res = await fetch('/api/stripe/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bookingId: booking.id,
+                    amount: parseFloat(emailFormData.caparra),
+                    customerEmail: booking.guest_email,
+                    propertyName: booking.properties?.name
+                })
+            });
+            const data = await res.json();
+            if (data.url) {
+                paymentLink = data.url;
+            } else {
+                console.error('Errore da Stripe:', data.error);
+                alert('Impossibile generare il link di pagamento: ' + data.error);
+                setIsGenerating(false);
+                return; // Ferma il processo se Stripe fallisce
+            }
+        } catch (err) {
+            console.error('Fetch Stripe API fallita:', err);
+            alert('Errore di comunicazione con il server per Stripe.');
+            setIsGenerating(false);
+            return;
+        }
+
+        // Il link di Stripe è spesso molto lungo nel test, raccomandabile mandarlo in una riga separata
         const body = encodeURIComponent(`Gentile ${booking.guest_name},
 
 Siamo felici di confermarle che la sua richiesta di prenotazione è stata APPROVATA!
@@ -105,7 +137,8 @@ Riepilogo soggiorno:
 Per confermare definitivamente la prenotazione (Stato: Booked), le chiediamo di procedere al pagamento della CAPARRA:
 - Importo Caparra: €${emailFormData.caparra}
 - Scadenza pagamento caparra: ${scadenzaCapArr}
-- Link per il pagamento Stripe: [INSERIRE QUI IL PAYMENT LINK O INVOICE LINK]
+- Link per il pagamento sicuro tramite Stripe: 
+${paymentLink}
 
 Il saldo finale dovrà essere versato con le seguenti tempistiche:
 - Importo Saldo: €${emailFormData.saldo}
@@ -116,6 +149,7 @@ Cordiali saluti,
 Vacanze Mare`);
 
         window.open(`mailto:${booking.guest_email}?subject=${subject}&body=${body}`, '_blank');
+        setIsGenerating(false);
         setEmailModal({ isOpen: false, booking: null });
     };
 
@@ -183,8 +217,10 @@ Vacanze Mare`);
                                 </div>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                                <button type="button" onClick={() => setEmailModal({ isOpen: false, booking: null })} className="btn" style={{ background: '#e2e8f0', color: 'black' }}>Annulla</button>
-                                <button type="submit" className="btn btn-primary">Approva e Apri Email</button>
+                                <button type="button" onClick={() => setEmailModal({ isOpen: false, booking: null })} disabled={isGenerating} className="btn" style={{ background: '#e2e8f0', color: 'black' }}>Annulla</button>
+                                <button type="submit" disabled={isGenerating} className="btn btn-primary" style={{ opacity: isGenerating ? 0.7 : 1 }}>
+                                    {isGenerating ? 'Generazione Link...' : 'Approva, Genera Link e Apri Email'}
+                                </button>
                             </div>
                         </form>
                     </div>
