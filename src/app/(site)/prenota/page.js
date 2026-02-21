@@ -1,14 +1,16 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import Calendar from '@/components/Calendar';
+import Link from 'next/link';
 
 export default function PrenotaPage() {
     const [properties, setProperties] = useState([]);
-    const [bookedDates, setBookedDates] = useState([]);
+    const [dateStatuses, setDateStatuses] = useState({});
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSuccess, setIsSuccess] = useState(false);
     const { t, locale } = useLanguage();
 
     const [formData, setFormData] = useState({
@@ -36,42 +38,110 @@ export default function PrenotaPage() {
     // Fetch delle date occupate quando cambia l'appartamento
     useEffect(() => {
         if (!formData.apartmentId) {
-            setBookedDates([]);
+            setDateStatuses({});
             return;
         }
 
         async function fetchBookings() {
             const { data, error } = await supabase
                 .from('bookings')
-                .select('check_in, check_out')
+                .select('check_in, check_out, status')
                 .eq('property_id', formData.apartmentId)
-                .neq('status', 'cancelled');
+                // SOLO date approvate o bloccate sono inaccessibili al pubblico. I pending restano selezionabili.
+                .in('status', ['approved', 'booked', 'confirmed']);
 
             if (error) {
                 console.error('Errore caricamento prenotazioni:', error);
             } else {
-                const dates = [];
+                const statuses = {};
                 data.forEach(booking => {
-                    let current = new Date(booking.check_in);
-                    const end = new Date(booking.check_out);
+                    // Estraiamo la sola stringa della data (YYYY-MM-DD)
+                    const checkInStr = booking.check_in.split('T')[0];
+                    const checkOutStr = booking.check_out.split('T')[0];
+
+                    // Partiamo dal checkIn, forzando orario 12:00 locale per evitare sbalzi di giorno dovuti al fuso
+                    let current = new Date(`${checkInStr}T12:00:00`);
+                    const end = new Date(`${checkOutStr}T12:00:00`);
+
                     while (current <= end) {
-                        dates.push(current.toISOString().split('T')[0]);
+                        const YYYY = current.getFullYear();
+                        const MM = String(current.getMonth() + 1).padStart(2, '0');
+                        const DD = String(current.getDate()).padStart(2, '0');
+                        const dateStr = `${YYYY}-${MM}-${DD}`;
+
+                        if (!statuses[dateStr]) {
+                            statuses[dateStr] = { morning: 'available', afternoon: 'available' };
+                        }
+
+                        // Trattiamo gli stati approvati/bloccati come "occupied" per il pubblico
+                        const displayStatus = ['approved', 'booked', 'confirmed'].includes(booking.status) ? 'occupied' : booking.status;
+
+                        if (dateStr === checkInStr && dateStr === checkOutStr) {
+                            statuses[dateStr].morning = displayStatus;
+                            statuses[dateStr].afternoon = displayStatus;
+                        } else if (dateStr === checkInStr) {
+                            statuses[dateStr].afternoon = displayStatus;
+                        } else if (dateStr === checkOutStr) {
+                            statuses[dateStr].morning = displayStatus;
+                        } else {
+                            statuses[dateStr].morning = displayStatus;
+                            statuses[dateStr].afternoon = displayStatus;
+                        }
+
                         current.setDate(current.getDate() + 1);
                     }
                 });
-                setBookedDates(dates);
+                setDateStatuses(statuses);
             }
         }
+
         fetchBookings();
     }, [formData.apartmentId]);
 
     const handleDateSelect = (date) => {
+        const getEffectiveStatus = (s) => (['approved', 'booked', 'confirmed'].includes(s) ? 'occupied' : 'available');
+
         if (!formData.checkIn || (formData.checkIn && formData.checkOut)) {
+            // Selecting checkIn
+            if (getEffectiveStatus(dateStatuses[date]?.afternoon) === 'occupied') {
+                return; // Pomeriggio occupato, non può entrare
+            }
             setFormData(prev => ({ ...prev, checkIn: date, checkOut: '' }));
         } else {
-            if (date < formData.checkIn) {
+            // Selecting checkOut
+            if (date <= formData.checkIn) {
+                // Restart checkIn picking
+                if (getEffectiveStatus(dateStatuses[date]?.afternoon) === 'occupied') {
+                    return;
+                }
                 setFormData(prev => ({ ...prev, checkIn: date, checkOut: '' }));
             } else {
+                // Validate range mapping
+                if (getEffectiveStatus(dateStatuses[date]?.morning) === 'occupied') {
+                    return; // Mattina occupata, non può uscire
+                }
+
+                let valid = true;
+                let cur = new Date(formData.checkIn);
+                cur.setDate(cur.getDate() + 1);
+                const end = new Date(date);
+                while (cur < end) {
+                    const YYYY = cur.getFullYear();
+                    const MM = String(cur.getMonth() + 1).padStart(2, '0');
+                    const DD = String(cur.getDate()).padStart(2, '0');
+                    const dStr = `${YYYY}-${MM}-${DD}`;
+
+                    if (getEffectiveStatus(dateStatuses[dStr]?.morning) === 'occupied' || getEffectiveStatus(dateStatuses[dStr]?.afternoon) === 'occupied') {
+                        valid = false;
+                        break;
+                    }
+                    cur.setDate(cur.getDate() + 1);
+                }
+
+                if (!valid) {
+                    alert('Attenzione, il periodo selezionato comprende date non disponibili');
+                    return;
+                }
                 setFormData(prev => ({ ...prev, checkOut: date }));
             }
         }
@@ -84,11 +154,34 @@ export default function PrenotaPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.checkIn || !formData.checkOut) {
-            alert(t('calendar.selectDates'));
+            alert(t('calendar.selectDates') || 'Seleziona le date nel calendario');
             return;
         }
 
         setIsSubmitting(true);
+
+        // --- CONTROLLO OVERLAP LATO SERVER ---
+        // Verifichiamo se esistono prenotazioni incompatibili nel medesimo range
+        const { data: overlaps, error: overlapError } = await supabase
+            .from('bookings')
+            .select('id')
+            .eq('property_id', formData.apartmentId)
+            .in('status', ['approved', 'booked', 'confirmed'])
+            .lt('check_in', formData.checkOut)
+            .gt('check_out', formData.checkIn);
+
+        if (overlapError) {
+            alert('Errore di validazione disponibilità: ' + overlapError.message);
+            setIsSubmitting(false);
+            return;
+        }
+
+        if (overlaps && overlaps.length > 0) {
+            alert('Attenzione, il periodo selezionato comprende date non disponibili');
+            setIsSubmitting(false);
+            return;
+        }
+        // -------------------------------------
 
         const selectedProperty = properties.find(p => p.id === formData.apartmentId);
 
@@ -106,21 +199,13 @@ export default function PrenotaPage() {
             guest_name: formData.name,
             guest_email: formData.email,
             total_price: total_price,
-            status: 'pending'
+            status: 'pending' // pending non blocca il calendario
         }]);
 
         if (error) {
-            alert(t('booking.error') + error.message);
+            alert((t('booking.error') || 'Errore:') + ' ' + error.message);
         } else {
-            alert(t('booking.success') + ' ' + t('booking.stripeNote'));
-            setFormData({
-                checkIn: '',
-                checkOut: '',
-                apartmentId: '',
-                guests: '1',
-                name: '',
-                email: ''
-            });
+            setIsSuccess(true);
         }
         setIsSubmitting(false);
     };
@@ -147,6 +232,23 @@ export default function PrenotaPage() {
     };
 
     if (loading) return <div className="container" style={{ padding: 'var(--space-l) 0' }}>{t('booking.loading')}</div>;
+
+    if (isSuccess) {
+        return (
+            <main style={{ padding: 'var(--space-xl) 0', minHeight: '100vh', background: 'var(--bg-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ background: 'white', padding: '4rem 2rem', borderRadius: '1rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', textAlign: 'center', maxWidth: '500px' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📧</div>
+                    <h2 style={{ marginBottom: '1rem', color: 'var(--primary)' }}>Email Inoltrata</h2>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: '1.6' }}>
+                        La tua richiesta di prenotazione è stata inviata con successo. Riceverai presto un'email di conferma con i dettagli per procedere.
+                    </p>
+                    <Link href="/" className="btn btn-primary" style={{ display: 'inline-block', textDecoration: 'none' }}>
+                        Torna alla Home page
+                    </Link>
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main style={{ padding: 'var(--space-l) 0', minHeight: '100vh', background: 'var(--bg-main)' }}>
@@ -181,7 +283,7 @@ export default function PrenotaPage() {
 
                         {formData.apartmentId && (
                             <Calendar
-                                bookedDates={bookedDates}
+                                dateStatuses={dateStatuses}
                                 onDateSelect={handleDateSelect}
                                 selectedRange={{ start: formData.checkIn, end: formData.checkOut }}
                             />
@@ -271,14 +373,14 @@ export default function PrenotaPage() {
                                 className="btn btn-primary"
                                 style={{ width: '100%', marginTop: 'var(--space-m)', fontSize: '1.1rem', opacity: (isSubmitting || !formData.apartmentId) ? 0.7 : 1 }}
                             >
-                                {isSubmitting ? t('booking.submitting') : t('booking.submit')}
+                                {isSubmitting ? t('booking.submitting') : 'Invio email di prenotazione'}
                             </button>
                         </form>
                     </div>
                 </div>
 
                 <p style={{ textAlign: 'center', marginTop: 'var(--space-m)', fontSize: '0.875rem' }}>
-                    {t('booking.stripeNote')}
+                    Le tue date non verranno bloccate finché non riceverai un'approvazione via email.
                 </p>
             </div>
         </main>

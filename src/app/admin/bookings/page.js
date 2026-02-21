@@ -7,6 +7,14 @@ export default function BookingsAdmin() {
     const [loading, setLoading] = useState(true);
     const [updatingId, setUpdatingId] = useState(null);
 
+    const [emailModal, setEmailModal] = useState({ isOpen: false, booking: null });
+    const [emailFormData, setEmailFormData] = useState({
+        caparra: 0,
+        scadenzaCaparra: '',
+        saldo: 0,
+        scadenzaSaldo: ''
+    });
+
     useEffect(() => {
         fetchBookings();
     }, []);
@@ -30,6 +38,32 @@ export default function BookingsAdmin() {
     }
 
     const updateStatus = async (id, newStatus) => {
+        if (newStatus === 'approved') {
+            const bookingToApprove = bookings.find(b => b.id === id);
+            const caparraProp = (bookingToApprove.total_price * 0.3).toFixed(2);
+            const saldoProp = (bookingToApprove.total_price - caparraProp).toFixed(2);
+
+            // Imposta scadenze di default (es. +3 giorni e -14 giorni dal check-in)
+            const scadCapDate = new Date();
+            scadCapDate.setDate(scadCapDate.getDate() + 3);
+
+            const scadSaldoDate = new Date(bookingToApprove.check_in);
+            scadSaldoDate.setDate(scadSaldoDate.getDate() - 14);
+
+            setEmailFormData({
+                caparra: caparraProp,
+                scadenzaCaparra: scadCapDate.toISOString().split('T')[0],
+                saldo: saldoProp,
+                scadenzaSaldo: scadSaldoDate.toISOString().split('T')[0]
+            });
+            setEmailModal({ isOpen: true, booking: bookingToApprove });
+            return; // L'aggiornamento vero e proprio avverrà dal modale
+        }
+
+        executeStatusUpdate(id, newStatus);
+    };
+
+    const executeStatusUpdate = async (id, newStatus) => {
         setUpdatingId(id);
         const { error } = await supabase
             .from('bookings')
@@ -42,6 +76,47 @@ export default function BookingsAdmin() {
             setBookings(prev => prev.map(b => b.id === id ? { ...b, status: newStatus } : b));
         }
         setUpdatingId(null);
+    };
+
+    const handleEmailGenerateAndApprove = (e) => {
+        e.preventDefault();
+        const { booking } = emailModal;
+
+        // Esegui approvazione sul DB
+        executeStatusUpdate(booking.id, 'approved');
+
+        // Genera Testo Email
+        const checkInDate = new Date(booking.check_in).toLocaleDateString();
+        const checkOutDate = new Date(booking.check_out).toLocaleDateString();
+        const scadenzaCapArr = new Date(emailFormData.scadenzaCaparra).toLocaleDateString();
+        const scadenzaSaldoArr = new Date(emailFormData.scadenzaSaldo).toLocaleDateString();
+
+        const subject = encodeURIComponent(`Approvazione Prenotazione - Vacanze Mare`);
+        const body = encodeURIComponent(`Gentile ${booking.guest_name},
+
+Siamo felici di confermarle che la sua richiesta di prenotazione è stata APPROVATA!
+
+Riepilogo soggiorno:
+- Struttura: ${booking.properties?.name}
+- Check-in: ${checkInDate}
+- Check-out: ${checkOutDate}
+- Totale: €${parseFloat(booking.total_price).toFixed(2)}
+
+Per confermare definitivamente la prenotazione (Stato: Booked), le chiediamo di procedere al pagamento della CAPARRA:
+- Importo Caparra: €${emailFormData.caparra}
+- Scadenza pagamento caparra: ${scadenzaCapArr}
+- Link per il pagamento Stripe: [INSERIRE QUI IL PAYMENT LINK O INVOICE LINK]
+
+Il saldo finale dovrà essere versato con le seguenti tempistiche:
+- Importo Saldo: €${emailFormData.saldo}
+- Scadenza pagamento saldo: ${scadenzaSaldoArr}
+
+Rimaniamo a disposizione per qualsiasi necessità.
+Cordiali saluti,
+Vacanze Mare`);
+
+        window.open(`mailto:${booking.guest_email}?subject=${subject}&body=${body}`, '_blank');
+        setEmailModal({ isOpen: false, booking: null });
     };
 
     const getStatusColor = (status) => {
@@ -59,6 +134,64 @@ export default function BookingsAdmin() {
 
     return (
         <div>
+            {/* INIZIO MODALE EMAIL */}
+            {emailModal.isOpen && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+                }}>
+                    <div style={{ background: 'white', padding: '2rem', borderRadius: '1rem', width: '100%', maxWidth: '500px' }}>
+                        <h2 style={{ marginTop: 0 }}>Genera Email Approvazione</h2>
+                        <p style={{ color: 'var(--text-muted)' }}>Configura gli importi e le scadenze per la mail di {emailModal.booking?.guest_name}.</p>
+
+                        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                <div><strong>Check-in:</strong> {new Date(emailModal.booking?.check_in).toLocaleDateString()}</div>
+                                <div><strong>Check-out:</strong> {new Date(emailModal.booking?.check_out).toLocaleDateString()}</div>
+                                <div>
+                                    <strong>Notti:</strong> {
+                                        Math.ceil(Math.abs(new Date(emailModal.booking?.check_out) - new Date(emailModal.booking?.check_in)) / (1000 * 60 * 60 * 24))
+                                    }
+                                </div>
+                                <div><strong>Importo totale:</strong> €{parseFloat(emailModal.booking?.total_price).toFixed(2)}</div>
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                    <strong>Prezzo medio giornaliero:</strong> €{(
+                                        emailModal.booking?.total_price /
+                                        Math.max(1, Math.ceil(Math.abs(new Date(emailModal.booking?.check_out) - new Date(emailModal.booking?.check_in)) / (1000 * 60 * 60 * 24)))
+                                    ).toFixed(2)}
+                                </div>
+                            </div>
+                        </div>
+
+                        <form onSubmit={handleEmailGenerateAndApprove}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Importo Caparra (€)</label>
+                                    <input type="number" step="0.01" value={emailFormData.caparra} onChange={e => setEmailFormData({ ...emailFormData, caparra: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Scadenza Caparra</label>
+                                    <input type="date" value={emailFormData.scadenzaCaparra} onChange={e => setEmailFormData({ ...emailFormData, scadenzaCaparra: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Importo Saldo (€)</label>
+                                    <input type="number" step="0.01" value={emailFormData.saldo} onChange={e => setEmailFormData({ ...emailFormData, saldo: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Scadenza Saldo</label>
+                                    <input type="date" value={emailFormData.scadenzaSaldo} onChange={e => setEmailFormData({ ...emailFormData, scadenzaSaldo: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                                <button type="button" onClick={() => setEmailModal({ isOpen: false, booking: null })} className="btn" style={{ background: '#e2e8f0', color: 'black' }}>Annulla</button>
+                                <button type="submit" className="btn btn-primary">Approva e Apri Email</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* FINE MODALE EMAIL */}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-l)' }}>
                 <h1>Gestione Prenotazioni</h1>
                 <button onClick={fetchBookings} className="btn" style={{ border: '1px solid var(--border)' }}>Aggiorna Lista</button>
