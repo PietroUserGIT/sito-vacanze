@@ -10,7 +10,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { bookingId, amount, customerEmail, propertyName } = body;
+        const { bookingId, amount, customerEmail, propertyName, paymentType } = body;
 
         if (!bookingId || !amount) {
             return NextResponse.json({ error: 'Dati mancanti per il pagamento' }, { status: 400 });
@@ -29,11 +29,15 @@ export async function POST(request) {
                     price_data: {
                         currency: 'eur',
                         product_data: {
-                            name: `Caparra Prenotazione: ${propertyName || 'Appartamento VacanzeMare'}`,
-                            description: `Pagamento caparra per la prenotazione #${bookingId.split('-')[0]}`,
+                            name: paymentType === 'balance'
+                                ? `Saldo Finale: ${propertyName || 'Appartamento VacanzeMare'}`
+                                : `Caparra Prenotazione: ${propertyName || 'Appartamento VacanzeMare'}`,
+                            description: paymentType === 'balance'
+                                ? `Pagamento saldo finale per la prenotazione #${bookingId.split('-')[0]}`
+                                : `Pagamento caparra per la prenotazione #${bookingId.split('-')[0]}`,
                         },
                         // Stripe usa i centesimi. Esempio: 150 EUR = 15000
-                        unit_amount: Math.round(amount * 100), 
+                        unit_amount: Math.round(amount * 100),
                     },
                     quantity: 1,
                 },
@@ -42,7 +46,7 @@ export async function POST(request) {
             // Passiamo il booking_id nei metadati per recuperarlo dal Webhook una volta pagato
             metadata: {
                 bookingId: bookingId,
-                paymentType: 'deposit', // "caparra"
+                paymentType: paymentType || 'deposit', // "deposit" o "balance"
             },
             // Dove rimandare l'utente finito il pagamento
             success_url: `${origin}/prenota/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -51,7 +55,7 @@ export async function POST(request) {
 
         // Rispondiamo al nostro frontend con l'URL segreto generato da Stripe
         return NextResponse.json({ url: session.url });
-        
+
     } catch (error) {
         console.error('Errore creazione Stripe Checkout:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });

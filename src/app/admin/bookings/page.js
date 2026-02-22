@@ -7,7 +7,7 @@ export default function BookingsAdmin() {
     const [loading, setLoading] = useState(true);
     const [updatingId, setUpdatingId] = useState(null);
 
-    const [emailModal, setEmailModal] = useState({ isOpen: false, booking: null });
+    const [emailModal, setEmailModal] = useState({ isOpen: false, booking: null, type: null });
     const [emailFormData, setEmailFormData] = useState({
         caparra: 0,
         scadenzaCaparra: '',
@@ -39,28 +39,7 @@ export default function BookingsAdmin() {
     }
 
     const updateStatus = async (id, newStatus) => {
-        if (newStatus === 'approved') {
-            const bookingToApprove = bookings.find(b => b.id === id);
-            const caparraProp = (bookingToApprove.total_price * 0.3).toFixed(2);
-            const saldoProp = (bookingToApprove.total_price - caparraProp).toFixed(2);
-
-            // Imposta scadenze di default (es. +3 giorni e -14 giorni dal check-in)
-            const scadCapDate = new Date();
-            scadCapDate.setDate(scadCapDate.getDate() + 3);
-
-            const scadSaldoDate = new Date(bookingToApprove.check_in);
-            scadSaldoDate.setDate(scadSaldoDate.getDate() - 14);
-
-            setEmailFormData({
-                caparra: caparraProp,
-                scadenzaCaparra: scadCapDate.toISOString().split('T')[0],
-                saldo: saldoProp,
-                scadenzaSaldo: scadSaldoDate.toISOString().split('T')[0]
-            });
-            setEmailModal({ isOpen: true, booking: bookingToApprove });
-            return; // L'aggiornamento vero e proprio avverrà dal modale
-        }
-
+        // Nessun modale o automatismo qui, cambiamo solo il db silente.
         executeStatusUpdate(id, newStatus);
     };
 
@@ -79,21 +58,40 @@ export default function BookingsAdmin() {
         setUpdatingId(null);
     };
 
-    const handleEmailGenerateAndApprove = async (e) => {
+    const openEmailModal = (booking, type) => {
+        const caparraProp = (booking.total_price * 0.3).toFixed(2);
+        const saldoProp = (booking.total_price - caparraProp).toFixed(2);
+
+        // Imposta scadenze di default (es. +3 giorni e -14 giorni dal check-in)
+        const scadCapDate = new Date();
+        scadCapDate.setDate(scadCapDate.getDate() + 3);
+
+        const scadSaldoDate = new Date(booking.check_in);
+        scadSaldoDate.setDate(scadSaldoDate.getDate() - 14);
+
+        setEmailFormData({
+            caparra: caparraProp,
+            scadenzaCaparra: scadCapDate.toISOString().split('T')[0],
+            saldo: saldoProp,
+            scadenzaSaldo: scadSaldoDate.toISOString().split('T')[0]
+        });
+        setEmailModal({ isOpen: true, booking, type });
+    };
+
+    const handleEmailGenerate = async (e) => {
         e.preventDefault();
-        const { booking } = emailModal;
+        const { booking, type } = emailModal;
         setIsGenerating(true);
 
-        // Esegui approvazione sul DB
-        executeStatusUpdate(booking.id, 'approved');
-
-        // Genera Testo Email
         const checkInDate = new Date(booking.check_in).toLocaleDateString();
         const checkOutDate = new Date(booking.check_out).toLocaleDateString();
         const scadenzaCapArr = new Date(emailFormData.scadenzaCaparra).toLocaleDateString();
         const scadenzaSaldoArr = new Date(emailFormData.scadenzaSaldo).toLocaleDateString();
 
-        const subject = encodeURIComponent(`Approvazione Prenotazione - Vacanze Mare`);
+        const subject = encodeURIComponent(type === 'deposit'
+            ? `Approvazione e Caparra Prenotazione - Vacanze Mare`
+            : `Saldo Finale Prenotazione - Vacanze Mare`);
+
         // Chiamata all'API Stripe per creare la Checkout Session
         let paymentLink = '[ERRORE GENERAZIONE LINK STRIPE]';
         try {
@@ -102,9 +100,10 @@ export default function BookingsAdmin() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     bookingId: booking.id,
-                    amount: parseFloat(emailFormData.caparra),
+                    amount: type === 'deposit' ? parseFloat(emailFormData.caparra) : parseFloat(emailFormData.saldo),
                     customerEmail: booking.guest_email,
-                    propertyName: booking.properties?.name
+                    propertyName: booking.properties?.name,
+                    paymentType: type
                 })
             });
             const data = await res.json();
@@ -123,34 +122,56 @@ export default function BookingsAdmin() {
             return;
         }
 
-        // Il link di Stripe è spesso molto lungo nel test, raccomandabile mandarlo in una riga separata
-        const body = encodeURIComponent(`Gentile ${booking.guest_name},
+        let bodyText = '';
 
-Siamo felici di confermarle che la sua richiesta di prenotazione è stata APPROVATA!
+        if (type === 'deposit') {
+            bodyText = `Gentile ${booking.guest_name},
+
+Siamo felici di confermarle che la sua prenotazione è stata APPROVATA!
 
 Riepilogo soggiorno:
 - Struttura: ${booking.properties?.name}
 - Check-in: ${checkInDate}
 - Check-out: ${checkOutDate}
-- Totale: €${parseFloat(booking.total_price).toFixed(2)}
 
-Per confermare definitivamente la prenotazione (Stato: Booked), le chiediamo di procedere al pagamento della CAPARRA:
-- Importo Caparra: €${emailFormData.caparra}
+Per confermare definitivamente le date sul calendario, le chiediamo di procedere al pagamento della CAPARRA:
+- Importo Caparra: €${emailFormData.caparra} su €${parseFloat(booking.total_price).toFixed(2)} totali
 - Scadenza pagamento caparra: ${scadenzaCapArr}
-- Link per il pagamento sicuro tramite Stripe: 
+
+- **Link Sicuro Stripe per la Caparra:** 
 ${paymentLink}
 
-Il saldo finale dovrà essere versato con le seguenti tempistiche:
-- Importo Saldo: €${emailFormData.saldo}
+Rimaniamo a disposizione.
+Cordiali saluti,
+Vacanze Mare`;
+        } else {
+            bodyText = `Gentile ${booking.guest_name},
+
+Ci avviciniamo alla data del suo soggiorno!
+Come da precedenti accordi, le chiediamo di procedere al versamento del SALDO FINALE per la sua prenotazione.
+
+Riepilogo soggiorno:
+- Struttura: ${booking.properties?.name}
+- Check-in: ${checkInDate}
+- Check-out: ${checkOutDate}
+
+Dettagli Saldo:
+- Importo Saldo Restante: €${emailFormData.saldo}
 - Scadenza pagamento saldo: ${scadenzaSaldoArr}
 
-Rimaniamo a disposizione per qualsiasi necessità.
+- **Link Sicuro Stripe per il Saldo:** 
+${paymentLink}
+
+Rimaniamo in attesa e le auguriamo un felice soggiorno!
 Cordiali saluti,
-Vacanze Mare`);
+Vacanze Mare`;
+        }
+
+        const body = encodeURIComponent(bodyText);
 
         window.open(`mailto:${booking.guest_email}?subject=${subject}&body=${body}`, '_blank');
         setIsGenerating(false);
-        setEmailModal({ isOpen: false, booking: null });
+        setEmailModal({ isOpen: false, booking: null, type: null });
     };
 
     const getStatusColor = (status) => {
@@ -175,51 +196,47 @@ Vacanze Mare`);
                     background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
                 }}>
                     <div style={{ background: 'white', padding: '2rem', borderRadius: '1rem', width: '100%', maxWidth: '500px' }}>
-                        <h2 style={{ marginTop: 0 }}>Genera Email Approvazione</h2>
-                        <p style={{ color: 'var(--text-muted)' }}>Configura gli importi e le scadenze per la mail di {emailModal.booking?.guest_name}.</p>
+                        <h2 style={{ marginTop: 0 }}>Genera Email e Link ({emailModal.type === 'deposit' ? 'Caparra' : 'Saldo'})</h2>
+                        <p style={{ color: 'var(--text-muted)' }}>Controlla importo e scadenza per il pagamento di {emailModal.booking?.guest_name}.</p>
 
                         <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                                 <div><strong>Check-in:</strong> {new Date(emailModal.booking?.check_in).toLocaleDateString()}</div>
                                 <div><strong>Check-out:</strong> {new Date(emailModal.booking?.check_out).toLocaleDateString()}</div>
-                                <div>
-                                    <strong>Notti:</strong> {
-                                        Math.ceil(Math.abs(new Date(emailModal.booking?.check_out) - new Date(emailModal.booking?.check_in)) / (1000 * 60 * 60 * 24))
-                                    }
-                                </div>
-                                <div><strong>Importo totale:</strong> €{parseFloat(emailModal.booking?.total_price).toFixed(2)}</div>
-                                <div style={{ gridColumn: '1 / -1' }}>
-                                    <strong>Prezzo medio giornaliero:</strong> €{(
-                                        emailModal.booking?.total_price /
-                                        Math.max(1, Math.ceil(Math.abs(new Date(emailModal.booking?.check_out) - new Date(emailModal.booking?.check_in)) / (1000 * 60 * 60 * 24)))
-                                    ).toFixed(2)}
-                                </div>
+                                <div style={{ gridColumn: '1 / -1' }}><strong>Costo Totale del Soggiorno:</strong> €{parseFloat(emailModal.booking?.total_price).toFixed(2)}</div>
                             </div>
                         </div>
 
-                        <form onSubmit={handleEmailGenerateAndApprove}>
+                        <form onSubmit={handleEmailGenerate}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Importo Caparra (€)</label>
-                                    <input type="number" step="0.01" value={emailFormData.caparra} onChange={e => setEmailFormData({ ...emailFormData, caparra: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Scadenza Caparra</label>
-                                    <input type="date" value={emailFormData.scadenzaCaparra} onChange={e => setEmailFormData({ ...emailFormData, scadenzaCaparra: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Importo Saldo (€)</label>
-                                    <input type="number" step="0.01" value={emailFormData.saldo} onChange={e => setEmailFormData({ ...emailFormData, saldo: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Scadenza Saldo</label>
-                                    <input type="date" value={emailFormData.scadenzaSaldo} onChange={e => setEmailFormData({ ...emailFormData, scadenzaSaldo: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
-                                </div>
+                                {emailModal.type === 'deposit' ? (
+                                    <>
+                                        <div>
+                                            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Importo Caparra (€)</label>
+                                            <input type="number" step="0.01" value={emailFormData.caparra} onChange={e => setEmailFormData({ ...emailFormData, caparra: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Scadenza Caparra</label>
+                                            <input type="date" value={emailFormData.scadenzaCaparra} onChange={e => setEmailFormData({ ...emailFormData, scadenzaCaparra: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div>
+                                            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Importo Saldo (€)</label>
+                                            <input type="number" step="0.01" value={emailFormData.saldo} onChange={e => setEmailFormData({ ...emailFormData, saldo: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Scadenza Saldo</label>
+                                            <input type="date" value={emailFormData.scadenzaSaldo} onChange={e => setEmailFormData({ ...emailFormData, scadenzaSaldo: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                        </div>
+                                    </>
+                                )}
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                                <button type="button" onClick={() => setEmailModal({ isOpen: false, booking: null })} disabled={isGenerating} className="btn" style={{ background: '#e2e8f0', color: 'black' }}>Annulla</button>
+                                <button type="button" onClick={() => setEmailModal({ isOpen: false, booking: null, type: null })} disabled={isGenerating} className="btn" style={{ background: '#e2e8f0', color: 'black' }}>Annulla</button>
                                 <button type="submit" disabled={isGenerating} className="btn btn-primary" style={{ opacity: isGenerating ? 0.7 : 1 }}>
-                                    {isGenerating ? 'Generazione Link...' : 'Approva, Genera Link e Apri Email'}
+                                    {isGenerating ? 'Generazione Link...' : 'Genera Link Stripe e Apri Email'}
                                 </button>
                             </div>
                         </form>
@@ -230,70 +247,84 @@ Vacanze Mare`);
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-l)' }}>
                 <h1>Gestione Prenotazioni</h1>
-                <button onClick={fetchBookings} className="btn" style={{ border: '1px solid var(--border)' }}>Aggiorna Lista</button>
+                <button onClick={fetchBookings} className="btn" style={{ border: '1px solid var(--border)' }}>Aggiorna Lista (F5)</button>
             </div>
 
             <div style={{ background: 'white', borderRadius: '1rem', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                    <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)' }}>
-                        <tr>
-                            <th style={{ padding: '1rem' }}>Ospite</th>
-                            <th style={{ padding: '1rem' }}>Appartamento</th>
-                            <th style={{ padding: '1rem' }}>Soggiorno</th>
-                            <th style={{ padding: '1rem' }}>Totale</th>
-                            <th style={{ padding: '1rem' }}>Stato</th>
-                            <th style={{ padding: '1rem' }}>Azioni</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {bookings.map((booking) => (
-                            <tr key={booking.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                <td style={{ padding: '1rem' }}>
-                                    <div style={{ fontWeight: '600' }}>{booking.guest_name}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{booking.guest_email}</div>
-                                </td>
-                                <td style={{ padding: '1rem' }}>{booking.properties?.name}</td>
-                                <td style={{ padding: '1rem' }}>
-                                    <div style={{ fontSize: '0.9rem' }}>{new Date(booking.check_in).toLocaleDateString()}</div>
-                                    <div style={{ fontSize: '0.9rem' }}>{new Date(booking.check_out).toLocaleDateString()}</div>
-                                </td>
-                                <td style={{ padding: '1rem', fontWeight: 'bold' }}>€{parseFloat(booking.total_price).toFixed(2)}</td>
-                                <td style={{ padding: '1rem' }}>
-                                    <span style={{
-                                        padding: '0.25rem 0.5rem',
-                                        borderRadius: '9999px',
-                                        fontSize: '0.75rem',
-                                        fontWeight: '600',
-                                        background: getStatusColor(booking.status) + '20',
-                                        color: getStatusColor(booking.status),
-                                        textTransform: 'uppercase'
-                                    }}>
-                                        {booking.status}
-                                    </span>
-                                </td>
-                                <td style={{ padding: '1rem' }}>
-                                    <select
-                                        value={booking.status}
-                                        onChange={(e) => updateStatus(booking.id, e.target.value)}
-                                        disabled={updatingId === booking.id}
-                                        style={{
-                                            padding: '0.4rem',
-                                            borderRadius: '0.4rem',
-                                            border: '1px solid var(--border)',
-                                            fontSize: '0.875rem'
-                                        }}
-                                    >
-                                        <option value="pending">Pending</option>
-                                        <option value="approved">Approved</option>
-                                        <option value="booked">Booked</option>
-                                        <option value="confirmed">Confirmed</option>
-                                        <option value="cancelled">Cancelled</option>
-                                    </select>
-                                </td>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
+                        <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)' }}>
+                            <tr>
+                                <th style={{ padding: '1rem' }}>Ospite</th>
+                                <th style={{ padding: '1rem' }}>Appartamento/Date</th>
+                                <th style={{ padding: '1rem' }}>Totale</th>
+                                <th style={{ padding: '1rem' }}>Caparra</th>
+                                <th style={{ padding: '1rem' }}>Saldo</th>
+                                <th style={{ padding: '1rem' }}>Stato (Manuale)</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {bookings.map((booking) => (
+                                <tr key={booking.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+
+                                    <td style={{ padding: '1rem' }}>
+                                        <div style={{ fontWeight: '600' }}>{booking.guest_name}</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{booking.guest_email}</div>
+                                    </td>
+
+                                    <td style={{ padding: '1rem' }}>
+                                        <div style={{ fontWeight: '500' }}>{booking.properties?.name}</div>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                            {new Date(booking.check_in).toLocaleDateString()} &rarr; {new Date(booking.check_out).toLocaleDateString()}
+                                        </div>
+                                    </td>
+
+                                    <td style={{ padding: '1rem', fontWeight: 'bold' }}>€{parseFloat(booking.total_price).toFixed(2)}</td>
+
+                                    <td style={{ padding: '1rem' }}>
+                                        <div style={{ fontSize: '0.8rem', marginBottom: '0.5rem', fontWeight: booking.caparra_paid_at ? 'bold' : 'normal', color: booking.caparra_paid_at ? '#10b981' : '#ef4444' }}>
+                                            {booking.caparra_paid_at ? `✔️ Pagata il ${new Date(booking.caparra_paid_at).toLocaleDateString()}` : '⏳ Non pagata'}
+                                        </div>
+                                        <button onClick={() => openEmailModal(booking, 'deposit')} className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}>✉️ Invia Link Caparra</button>
+                                    </td>
+
+                                    <td style={{ padding: '1rem' }}>
+                                        <div style={{ fontSize: '0.8rem', marginBottom: '0.5rem', fontWeight: booking.saldo_paid_at ? 'bold' : 'normal', color: booking.saldo_paid_at ? '#10b981' : '#ef4444' }}>
+                                            {booking.saldo_paid_at ? `✔️ Pagato il ${new Date(booking.saldo_paid_at).toLocaleDateString()}` : '⏳ Non pagato'}
+                                        </div>
+                                        <button onClick={() => openEmailModal(booking, 'balance')} className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: '#3b82f6' }}>✉️ Invia Link Saldo</button>
+                                    </td>
+
+                                    <td style={{ padding: '1rem' }}>
+                                        <select
+                                            value={booking.status}
+                                            onChange={(e) => updateStatus(booking.id, e.target.value)}
+                                            disabled={updatingId === booking.id}
+                                            style={{
+                                                padding: '0.4rem',
+                                                borderRadius: '0.4rem',
+                                                border: '2px solid',
+                                                borderColor: getStatusColor(booking.status),
+                                                backgroundColor: getStatusColor(booking.status) + '10',
+                                                color: getStatusColor(booking.status),
+                                                fontWeight: 'bold',
+                                                fontSize: '0.8rem',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <option value="pending" style={{ color: 'black' }}>Pending</option>
+                                            <option value="approved" style={{ color: 'black' }}>Approved</option>
+                                            <option value="booked" style={{ color: 'black' }}>Booked</option>
+                                            <option value="confirmed" style={{ color: 'black' }}>Confirmed</option>
+                                            <option value="cancelled" style={{ color: 'black' }}>Cancelled</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
                 {bookings.length === 0 && (
                     <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                         Nessuna prenotazione trovata.

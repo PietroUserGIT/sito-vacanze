@@ -34,19 +34,27 @@ export async function POST(req) {
         console.log(`🔔 Pagamento ricevuto per booking: ${bookingId}`);
 
         if (paymentType === 'deposit') {
-            // Aggiorniamo lo stato su Supabase a 'booked'
-            // NB: Come stabilito, 'booked' blocca le date sul calendario pubblico
             const { error } = await supabase
                 .from('bookings')
-                .update({ status: 'booked' })
+                .update({ caparra_paid_at: new Date().toISOString() })
                 .eq('id', bookingId);
 
             if (error) {
-                console.error('❌ Errore aggiornamento Supabase via Webhook:', error);
-                return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
+                console.error('❌ Errore update caparra_paid_at su Supabase:', error);
+                return NextResponse.json({ error: 'Database update deposit failed' }, { status: 500 });
             }
+            console.log(`✅ Caparra registrata per la prenotazione ${bookingId}`);
+        } else if (paymentType === 'balance') {
+            const { error } = await supabase
+                .from('bookings')
+                .update({ saldo_paid_at: new Date().toISOString() })
+                .eq('id', bookingId);
 
-            console.log(`✅ Prenotazione ${bookingId} spostata in stato BOOKED.`);
+            if (error) {
+                console.error('❌ Errore update saldo_paid_at su Supabase:', error);
+                return NextResponse.json({ error: 'Database update balance failed' }, { status: 500 });
+            }
+            console.log(`✅ Saldo registrato per la prenotazione ${bookingId}`);
         }
     }
 
