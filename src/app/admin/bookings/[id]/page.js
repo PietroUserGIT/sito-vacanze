@@ -41,6 +41,7 @@ export default function BookingDetail() {
             console.error('Errore caricamento prenotazione:', error);
         } else if (data) {
             setBooking(data);
+            setStatus(data.status || 'pending');
             // Manteniamo le logiche su status e date vere
         }
         setLoading(false);
