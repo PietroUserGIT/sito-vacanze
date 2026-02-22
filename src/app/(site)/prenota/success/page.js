@@ -11,8 +11,7 @@ export default function PaymentSuccessPage() {
                 <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎉</div>
                 <h2 style={{ marginBottom: '1rem', color: 'var(--primary)' }}>Pagamento Completato!</h2>
                 <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: '1.6' }}>
-                    Grazie! La caparra è stata ricevuta con successo. La tua prenotazione è ora confermata e le date sono state bloccate sul calendario.
-                    Riceverai a breve un'email di riepilogo.
+                    Operazione eseguita! La Sua prenotazione è ora confermata, nei prossimi giorni riceverà l'e-mail con il link per il pagamento del saldo.
                 </p>
                 <Link href="/" className="btn btn-primary" style={{ display: 'inline-block', textDecoration: 'none' }}>
                     Torna alla Home page

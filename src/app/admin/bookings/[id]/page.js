@@ -13,13 +13,13 @@ export default function BookingDetail() {
 
     // States for dates and status
     const [status, setStatus] = useState('pending');
-    const [caparraDate, setCaparraDate] = useState('');
-    const [saldoDate, setSaldoDate] = useState('');
 
     const [emailModal, setEmailModal] = useState({ isOpen: false, type: null });
     const [emailFormData, setEmailFormData] = useState({
-        amount: 0,
-        dueDate: ''
+        caparraAmount: 0,
+        caparraDueDate: '',
+        saldoAmount: 0,
+        saldoDueDate: ''
     });
     const [isGenerating, setIsGenerating] = useState(false);
 
@@ -41,10 +41,7 @@ export default function BookingDetail() {
             console.error('Errore caricamento prenotazione:', error);
         } else if (data) {
             setBooking(data);
-            setStatus(data.status || 'pending');
-            // Supabase returns timestamps. We want YYYY-MM-DD for date inputs
-            setCaparraDate(data.caparra_paid_at ? new Date(data.caparra_paid_at).toISOString().split('T')[0] : '');
-            setSaldoDate(data.saldo_paid_at ? new Date(data.saldo_paid_at).toISOString().split('T')[0] : '');
+            // Manteniamo le logiche su status e date vere
         }
         setLoading(false);
     }
@@ -52,9 +49,7 @@ export default function BookingDetail() {
     const handleSave = async () => {
         setUpdatingId(id);
         const updateData = {
-            status: status,
-            caparra_paid_at: caparraDate ? new Date(caparraDate).toISOString() : null,
-            saldo_paid_at: saldoDate ? new Date(saldoDate).toISOString() : null,
+            status: status
         };
 
         const { error } = await supabase
@@ -76,21 +71,19 @@ export default function BookingDetail() {
         const caparraProp = (booking.total_price * 0.3).toFixed(2);
         const saldoProp = (booking.total_price - caparraProp).toFixed(2);
 
-        if (type === 'deposit') {
-            const scadCapDate = new Date();
-            scadCapDate.setDate(scadCapDate.getDate() + 3);
-            setEmailFormData({
-                amount: caparraProp,
-                dueDate: scadCapDate.toISOString().split('T')[0]
-            });
-        } else {
-            const scadSaldoDate = new Date(booking.check_in);
-            scadSaldoDate.setDate(scadSaldoDate.getDate() - 14);
-            setEmailFormData({
-                amount: saldoProp,
-                dueDate: scadSaldoDate.toISOString().split('T')[0]
-            });
-        }
+        const scadCapDate = new Date();
+        scadCapDate.setDate(scadCapDate.getDate() + 3);
+
+        const scadSaldoDate = new Date(booking.check_in);
+        scadSaldoDate.setDate(scadSaldoDate.getDate() - 14);
+
+        setEmailFormData({
+            caparraAmount: caparraProp,
+            caparraDueDate: scadCapDate.toISOString().split('T')[0],
+            saldoAmount: saldoProp,
+            saldoDueDate: scadSaldoDate.toISOString().split('T')[0]
+        });
+
         setEmailModal({ isOpen: true, type });
     };
 
@@ -101,7 +94,9 @@ export default function BookingDetail() {
 
         const checkInDate = new Date(booking.check_in).toLocaleDateString();
         const checkOutDate = new Date(booking.check_out).toLocaleDateString();
-        const scadenzaArr = new Date(emailFormData.dueDate).toLocaleDateString();
+
+        const scadenzaCapArr = new Date(emailFormData.caparraDueDate).toLocaleDateString();
+        const scadenzaSaldoArr = new Date(emailFormData.saldoDueDate).toLocaleDateString();
 
         const subject = encodeURIComponent(type === 'deposit'
             ? `Approvazione e Caparra Prenotazione - Vacanze Mare`
@@ -114,7 +109,7 @@ export default function BookingDetail() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     bookingId: booking.id,
-                    amount: parseFloat(emailFormData.amount),
+                    amount: type === 'deposit' ? parseFloat(emailFormData.caparraAmount) : parseFloat(emailFormData.saldoAmount),
                     customerEmail: booking.guest_email,
                     propertyName: booking.properties?.name,
                     paymentType: type
@@ -139,9 +134,9 @@ export default function BookingDetail() {
         let bodyText = '';
 
         if (type === 'deposit') {
-            bodyText = `Gentile ${booking.guest_name},\n\nSiamo felici di confermarle che la sua prenotazione è stata APPROVATA!\n\nRiepilogo soggiorno:\n- Struttura: ${booking.properties?.name}\n- Check-in: ${checkInDate}\n- Check-out: ${checkOutDate}\n\nPer confermare definitivamente le date sul calendario, le chiediamo di procedere al pagamento della CAPARRA:\n- Importo Caparra: €${emailFormData.amount} su €${parseFloat(booking.total_price).toFixed(2)} totali\n- Scadenza pagamento caparra: ${scadenzaArr}\n\n- **Link Sicuro Stripe per la Caparra:** \n${paymentLink}\n\nRimaniamo a disposizione.\nCordiali saluti,\nVacanze Mare`;
+            bodyText = `Gentile ${booking.guest_name},\n\nSiamo felici di confermarle che la sua prenotazione è stata APPROVATA!\n\nRiepilogo soggiorno:\n- Struttura: ${booking.properties?.name}\n- Check-in: ${checkInDate}\n- Check-out: ${checkOutDate}\n\nPer confermare definitivamente le date sul calendario, le chiediamo di procedere al pagamento della CAPARRA:\n- Importo Caparra: €${emailFormData.caparraAmount} su €${parseFloat(booking.total_price).toFixed(2)} totali\n- Scadenza pagamento caparra: ${scadenzaCapArr}\n\n- **Link Sicuro Stripe per la Caparra:** \n${paymentLink}\n\nDopo il pagamento della caparra le sarà inviata un'ulteriore mail contenente il link per il pagamento del saldo.\n\nRimaniamo a disposizione.\nCordiali saluti,\nVacanze Mare`;
         } else {
-            bodyText = `Gentile ${booking.guest_name},\n\nCi avviciniamo alla data del suo soggiorno!\nCome da precedenti accordi, le chiediamo di procedere al versamento del SALDO FINALE per la sua prenotazione.\n\nRiepilogo soggiorno:\n- Struttura: ${booking.properties?.name}\n- Check-in: ${checkInDate}\n- Check-out: ${checkOutDate}\n\nDettagli Saldo:\n- Importo Saldo Restante: €${emailFormData.amount}\n- Scadenza pagamento saldo: ${scadenzaArr}\n\n- **Link Sicuro Stripe per il Saldo:** \n${paymentLink}\n\nRimaniamo in attesa e le auguriamo un felice soggiorno!\nCordiali saluti,\nVacanze Mare`;
+            bodyText = `Gentile ${booking.guest_name},\n\nCi avviciniamo alla data del suo soggiorno!\nCome da precedenti accordi, le chiediamo di procedere al versamento del SALDO FINALE per la sua prenotazione.\n\nRiepilogo soggiorno:\n- Struttura: ${booking.properties?.name}\n- Check-in: ${checkInDate}\n- Check-out: ${checkOutDate}\n\nDettagli Saldo:\n- Importo Saldo Restante: €${emailFormData.saldoAmount}\n- Scadenza pagamento saldo: ${scadenzaSaldoArr}\n\n- **Link Sicuro Stripe per il Saldo:** \n${paymentLink}\n\nRimaniamo in attesa e le auguriamo un felice soggiorno!\nCordiali saluti,\nVacanze Mare`;
         }
 
         const body = encodeURIComponent(bodyText);
@@ -173,24 +168,38 @@ export default function BookingDetail() {
                     background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
                 }}>
                     <div style={{ background: 'white', padding: '2rem', borderRadius: '1rem', width: '100%', maxWidth: '500px' }}>
-                        <h2 style={{ marginTop: 0 }}>Genera Email e Link ({emailModal.type === 'deposit' ? 'Caparra' : 'Saldo'})</h2>
-                        <p style={{ color: 'var(--text-muted)' }}>Controlla importo e scadenza per il pagamento di {booking.guest_name}.</p>
+                        <h2 style={{ marginTop: 0 }}>Gestione {emailModal.type === 'deposit' ? 'Caparra' : 'Saldo'}</h2>
+                        <p style={{ color: 'var(--text-muted)' }}>Controlla importi e scadenze per il pagamento di {booking.guest_name}.</p>
 
                         <form onSubmit={handleEmailGenerate}>
-                            <div style={{ display: 'grid', gap: '1rem', marginBottom: '1.5rem' }}>
+                            <h4 style={{ marginBottom: '0.5rem' }}>Dati Caparra</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem', opacity: emailModal.type === 'balance' ? 0.6 : 1 }}>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Importo (€)</label>
-                                    <input type="number" step="0.01" value={emailFormData.amount} onChange={e => setEmailFormData({ ...emailFormData, amount: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Importo Caparra (€)</label>
+                                    <input type="number" step="0.01" value={emailFormData.caparraAmount} onChange={e => setEmailFormData({ ...emailFormData, caparraAmount: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required disabled={emailModal.type === 'balance'} />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Scadenza Pagamento</label>
-                                    <input type="date" value={emailFormData.dueDate} onChange={e => setEmailFormData({ ...emailFormData, dueDate: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Scadenza Caparra</label>
+                                    <input type="date" value={emailFormData.caparraDueDate} onChange={e => setEmailFormData({ ...emailFormData, caparraDueDate: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required disabled={emailModal.type === 'balance'} />
                                 </div>
                             </div>
+
+                            <h4 style={{ marginBottom: '0.5rem' }}>Dati Saldo</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Importo Saldo (€)</label>
+                                    <input type="number" step="0.01" value={emailFormData.saldoAmount} onChange={e => setEmailFormData({ ...emailFormData, saldoAmount: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.2rem' }}>Scadenza Saldo</label>
+                                    <input type="date" value={emailFormData.saldoDueDate} onChange={e => setEmailFormData({ ...emailFormData, saldoDueDate: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.3rem', border: '1px solid #ccc' }} required />
+                                </div>
+                            </div>
+
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                                 <button type="button" onClick={() => setEmailModal({ isOpen: false, type: null })} disabled={isGenerating} className="btn" style={{ background: '#e2e8f0', color: 'black' }}>Annulla</button>
                                 <button type="submit" disabled={isGenerating} className="btn btn-primary" style={{ opacity: isGenerating ? 0.7 : 1 }}>
-                                    {isGenerating ? 'Generazione Link...' : 'Genera Link Stripe e Apri Email'}
+                                    {isGenerating ? 'Generazione Link...' : `Invia Link ${emailModal.type === 'deposit' ? 'Caparra' : 'Saldo'}`}
                                 </button>
                             </div>
                         </form>
@@ -214,6 +223,21 @@ export default function BookingDetail() {
                         <p><strong>Check-in:</strong> {new Date(booking.check_in).toLocaleDateString()}</p>
                         <p><strong>Check-out:</strong> {new Date(booking.check_out).toLocaleDateString()}</p>
                         <p><strong>Prezzo Totale:</strong> €{parseFloat(booking.total_price).toFixed(2)}</p>
+
+                        <div style={{ marginTop: '2rem', padding: '1rem', background: '#f8fafc', borderRadius: '0.5rem', fontSize: '0.9rem', border: '1px solid var(--border)' }}>
+                            <div style={{ marginBottom: '1rem' }}>
+                                <strong>Data effettiva versamento caparra:</strong><br />
+                                <span style={{ color: booking.caparra_paid_at ? 'var(--primary)' : 'var(--text-muted)' }}>
+                                    {booking.caparra_paid_at ? new Date(booking.caparra_paid_at).toLocaleDateString() : 'Non ancora versata'}
+                                </span>
+                            </div>
+                            <div>
+                                <strong>Data effettiva versamento saldo:</strong><br />
+                                <span style={{ color: booking.saldo_paid_at ? 'var(--primary)' : 'var(--text-muted)' }}>
+                                    {booking.saldo_paid_at ? new Date(booking.saldo_paid_at).toLocaleDateString() : 'Non ancora versato'}
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Gestione Stato e Pagamenti */}
@@ -248,36 +272,22 @@ export default function BookingDetail() {
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                             <div>
-                                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem' }}>Data versamento caparra</label>
-                                <input
-                                    type="date"
-                                    value={caparraDate}
-                                    onChange={(e) => setCaparraDate(e.target.value)}
-                                    style={{ width: '100%', padding: '0.6rem', borderRadius: '0.4rem', border: '1px solid var(--border)' }}
-                                />
                                 <button
                                     onClick={() => openEmailModal('deposit')}
                                     className="btn btn-primary"
-                                    style={{ width: '100%', marginTop: '0.5rem', padding: '0.4rem', fontSize: '0.8rem' }}
+                                    style={{ width: '100%', padding: '0.8rem', fontSize: '0.9rem' }}
                                 >
-                                    ✉️ Invia Link Caparra
+                                    ⚖️ Gestione Caparra
                                 </button>
                             </div>
 
                             <div>
-                                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem' }}>Data versamento saldo</label>
-                                <input
-                                    type="date"
-                                    value={saldoDate}
-                                    onChange={(e) => setSaldoDate(e.target.value)}
-                                    style={{ width: '100%', padding: '0.6rem', borderRadius: '0.4rem', border: '1px solid var(--border)' }}
-                                />
                                 <button
                                     onClick={() => openEmailModal('balance')}
                                     className="btn btn-primary"
-                                    style={{ width: '100%', marginTop: '0.5rem', padding: '0.4rem', fontSize: '0.8rem', background: '#3b82f6' }}
+                                    style={{ width: '100%', padding: '0.8rem', fontSize: '0.9rem', background: '#3b82f6' }}
                                 >
-                                    ✉️ Invia Link Saldo
+                                    ⚖️ Gestione Saldo
                                 </button>
                             </div>
                         </div>

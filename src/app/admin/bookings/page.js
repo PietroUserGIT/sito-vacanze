@@ -51,7 +51,7 @@ export default function BookingsAdmin() {
 
             <div style={{ background: 'white', borderRadius: '1rem', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                 <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                         <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)' }}>
                             <tr>
                                 <th style={{ padding: '1rem' }}>Ospite</th>
@@ -74,7 +74,7 @@ export default function BookingsAdmin() {
                                     <td style={{ padding: '1rem' }}>
                                         <div style={{ fontWeight: '500' }}>{booking.properties?.name}</div>
                                     </td>
-                                    
+
                                     <td style={{ padding: '1rem' }}>
                                         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                                             {new Date(booking.check_in).toLocaleDateString()}
@@ -83,7 +83,7 @@ export default function BookingsAdmin() {
 
                                     <td style={{ padding: '1rem' }}>
                                         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                             {new Date(booking.check_out).toLocaleDateString()}
+                                            {new Date(booking.check_out).toLocaleDateString()}
                                         </div>
                                     </td>
 

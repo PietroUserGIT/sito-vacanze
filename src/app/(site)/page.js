@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
+import Link from 'next/link';
 
 export default function Home() {
   const [properties, setProperties] = useState([]);
@@ -75,7 +76,7 @@ export default function Home() {
                     <span style={{ fontWeight: '700', color: 'var(--accent)', fontSize: '1.2rem' }}>
                       {t('home.priceFrom').replace('{price}', property.price_per_night)}
                     </span>
-                    <a href="/prenota" className="btn btn-primary">{t('home.book')}</a>
+                    <Link href={`/prenota?property=${property.id}`} className="btn btn-primary">{t('home.book')}</Link>
                   </div>
                 </div>
               </div>

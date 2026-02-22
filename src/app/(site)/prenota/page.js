@@ -4,8 +4,11 @@ import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import Calendar from '@/components/Calendar';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function PrenotaPage() {
+function PrenotaContent() {
+    const searchParams = useSearchParams();
     const [properties, setProperties] = useState([]);
     const [dateStatuses, setDateStatuses] = useState({});
     const [loading, setLoading] = useState(true);
@@ -16,7 +19,7 @@ export default function PrenotaPage() {
     const [formData, setFormData] = useState({
         checkIn: '',
         checkOut: '',
-        apartmentId: '',
+        apartmentId: searchParams.get('property') || '',
         guests: '1',
         name: '',
         email: ''
@@ -356,7 +359,25 @@ export default function PrenotaPage() {
                                 value={formData.name}
                             />
 
-                            <label style={labelStyle}>{t('booking.email')}</label>
+                            <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {t('booking.email')}
+                                <span
+                                    title="L'e-mail inserita verrà utilizzata esclusivamente per le comunicazioni relative al soggiorno e per notificare i link dei pagamenti da effettuare."
+                                    style={{
+                                        display: 'inline-flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        width: '1.2rem',
+                                        height: '1.2rem',
+                                        borderRadius: '50%',
+                                        background: 'var(--primary)',
+                                        color: 'white',
+                                        fontSize: '0.75rem',
+                                        cursor: 'help'
+                                    }}>
+                                    i
+                                </span>
+                            </label>
                             <input
                                 type="email"
                                 name="email"
@@ -373,7 +394,7 @@ export default function PrenotaPage() {
                                 className="btn btn-primary"
                                 style={{ width: '100%', marginTop: 'var(--space-m)', fontSize: '1.1rem', opacity: (isSubmitting || !formData.apartmentId) ? 0.7 : 1 }}
                             >
-                                {isSubmitting ? t('booking.submitting') : 'Invio email di prenotazione'}
+                                {isSubmitting ? t('booking.submitting') : 'Invio richiesta di prenotazione'}
                             </button>
                         </form>
                     </div>
@@ -384,5 +405,13 @@ export default function PrenotaPage() {
                 </p>
             </div>
         </main>
+    );
+}
+
+export default function PrenotaPage() {
+    return (
+        <Suspense fallback={<div className="container" style={{ padding: 'var(--space-l) 0' }}>Caricamento...</div>}>
+            <PrenotaContent />
+        </Suspense>
     );
 }

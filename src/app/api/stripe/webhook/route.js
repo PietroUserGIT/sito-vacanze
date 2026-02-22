@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2023-10-16',
 });
+
+// IMPORTANTISSIMO: I Webhook arrivano come chiamate server-to-server anonime (no utente loggato).
+// Per aggiornare Row Level Security su "bookings" serve un client di amministrazione.
+const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY ? createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+) : null;
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -33,8 +41,16 @@ export async function POST(req) {
 
         console.log(`🔔 Pagamento ricevuto per booking: ${bookingId}`);
 
+        // IMPORTANTISSIMO: I Webhook arrivano come chiamate server-to-server anonime (no utente loggato).
+        // Per aggiornare Row Level Security su "bookings" serve un client di amministrazione.
+
+        if (!supabaseAdmin) {
+            console.error('Manca SUPABASE_SERVICE_ROLE_KEY. Update ignorato.');
+            return NextResponse.json({ error: 'Manca Service Role Key' }, { status: 500 });
+        }
+
         if (paymentType === 'deposit') {
-            const { error } = await supabase
+            const { error } = await supabaseAdmin
                 .from('bookings')
                 .update({ caparra_paid_at: new Date().toISOString() })
                 .eq('id', bookingId);
@@ -45,7 +61,7 @@ export async function POST(req) {
             }
             console.log(`✅ Caparra registrata per la prenotazione ${bookingId}`);
         } else if (paymentType === 'balance') {
-            const { error } = await supabase
+            const { error } = await supabaseAdmin
                 .from('bookings')
                 .update({ saldo_paid_at: new Date().toISOString() })
                 .eq('id', bookingId);
