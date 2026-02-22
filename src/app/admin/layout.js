@@ -94,6 +94,15 @@ export default function AdminLayout({ children }) {
                     }}>
                         🗓️ Calendario
                     </Link>
+                    <Link href="/admin/settings" style={{
+                        padding: '0.75rem 1rem',
+                        borderRadius: '0.5rem',
+                        background: pathname === '/admin/settings' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        color: 'white',
+                        textDecoration: 'none'
+                    }}>
+                        ⚙️ Impostazioni
+                    </Link>
                 </nav>
 
                 <div style={{ marginTop: 'auto', paddingTop: 'var(--space-m)', borderTop: '1px solid rgba(255,255,255,0.1)' }}>

@@ -134,11 +134,43 @@ export default function BookingDetail() {
 
         let bodyText = '';
 
-        if (type === 'deposit') {
-            bodyText = `Gentile ${booking.guest_name},\n\nSiamo felici di confermarle che la sua prenotazione è stata APPROVATA!\n\nRiepilogo soggiorno:\n- Struttura: ${booking.properties?.name}\n- Check-in: ${checkInDate}\n- Check-out: ${checkOutDate}\n\nPer confermare definitivamente le date sul calendario, le chiediamo di procedere al pagamento della CAPARRA:\n- Importo Caparra: €${emailFormData.caparraAmount} su €${parseFloat(booking.total_price).toFixed(2)} totali\n- Scadenza pagamento caparra: ${scadenzaCapArr}\n\n- **Link Sicuro Stripe per la Caparra:** \n${paymentLink}\n\nDopo il pagamento della caparra le sarà inviata un'ulteriore mail contenente il link per il pagamento del saldo.\n\nRimaniamo a disposizione.\nCordiali saluti,\nVacanze Mare`;
-        } else {
-            bodyText = `Gentile ${booking.guest_name},\n\nCi avviciniamo alla data del suo soggiorno!\nCome da precedenti accordi, le chiediamo di procedere al versamento del SALDO FINALE per la sua prenotazione.\n\nRiepilogo soggiorno:\n- Struttura: ${booking.properties?.name}\n- Check-in: ${checkInDate}\n- Check-out: ${checkOutDate}\n\nDettagli Saldo:\n- Importo Saldo Restante: €${emailFormData.saldoAmount}\n- Scadenza pagamento saldo: ${scadenzaSaldoArr}\n\n- **Link Sicuro Stripe per il Saldo:** \n${paymentLink}\n\nRimaniamo in attesa e le auguriamo un felice soggiorno!\nCordiali saluti,\nVacanze Mare`;
+        // Recuperiamo i template dal database
+        const { data: settingsData } = await supabase
+            .from('settings')
+            .select('*')
+            .in('id', ['email_deposit_template', 'email_balance_template']);
+
+        const templates = {};
+        if (settingsData) {
+            settingsData.forEach(s => templates[s.id] = s.value);
         }
+
+        const activeTemplate = type === 'deposit'
+            ? (templates.email_deposit_template || 'Gentile {{guest_name}}, approvazione prenotazione...')
+            : (templates.email_balance_template || 'Gentile {{guest_name}}, richiesta saldo...');
+
+        const replaceTags = (text, data) => {
+            return text
+                .replace(/{{guest_name}}/g, data.guest_name)
+                .replace(/{{property_name}}/g, data.property_name)
+                .replace(/{{check_in}}/g, data.check_in)
+                .replace(/{{check_out}}/g, data.check_out)
+                .replace(/{{total_price}}/g, data.total_price)
+                .replace(/{{payment_amount}}/g, data.payment_amount)
+                .replace(/{{due_date}}/g, data.due_date)
+                .replace(/{{payment_link}}/g, data.payment_link);
+        };
+
+        bodyText = replaceTags(activeTemplate, {
+            guest_name: booking.guest_name,
+            property_name: booking.properties?.name || 'Appartamento',
+            check_in: checkInDate,
+            check_out: checkOutDate,
+            total_price: parseFloat(booking.total_price).toFixed(2),
+            payment_amount: type === 'deposit' ? emailFormData.caparraAmount : emailFormData.saldoAmount,
+            due_date: type === 'deposit' ? scadenzaCapArr : scadenzaSaldoArr,
+            payment_link: paymentLink
+        });
 
         const body = encodeURIComponent(bodyText);
         window.open(`mailto:${booking.guest_email}?subject=${subject}&body=${body}`, '_blank');
