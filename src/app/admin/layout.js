@@ -105,7 +105,22 @@ export default function AdminLayout({ children }) {
                     </Link>
                 </nav>
 
-                <div style={{ marginTop: 'auto', paddingTop: 'var(--space-m)', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ marginTop: 'auto', paddingTop: 'var(--space-m)', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <Link href="/" target="_blank" style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        background: 'rgba(255,255,255,0.1)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        color: 'white',
+                        borderRadius: '0.5rem',
+                        textAlign: 'center',
+                        textDecoration: 'none',
+                        display: 'block',
+                        fontSize: '0.9rem'
+                    }}>
+                        🌐 Vai al Sito
+                    </Link>
+
                     <button
                         onClick={handleLogout}
                         style={{

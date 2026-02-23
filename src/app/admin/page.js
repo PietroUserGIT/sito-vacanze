@@ -144,7 +144,6 @@ export default function AdminDashboard() {
                 </p>
                 <div style={{ marginTop: '2rem', display: 'flex', gap: 'var(--space-s)' }}>
                     <a href="/admin/bookings" className="btn btn-primary">Gestisci Prenotazioni</a>
-                    <a href="/" target="_blank" className="btn" style={{ border: '1px solid var(--border)' }}>Vedi Sito Pubblico</a>
                 </div>
             </div>
         </div>
