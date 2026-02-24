@@ -45,7 +45,7 @@ Per lavorare sul progetto, assicurarsi che il file `.env.local` contenga:
 Se riscontri problemi in queste aree, consulta queste specifiche:
 - **Status Reset**: Sistemato bug in `admin/bookings/[id]/page.js` dove lo stato tornava a "Pending" al caricamento (mancava `setStatus` nel `fetch`).
 - **Webhook 500 Error**: Risolto aggiungendo `await headers()` e passando al client `supabaseAdmin`.
-- **UI Admin**: Pulizia dei campi date obsoleti (`due_date` nel DB non più usati) a favore delle "Date Effettive" popolate automaticamente.
+- **UI Admin**: Pulizia dei campi date obsoleti (`due_date` nel DB non più usati) a favore delle "Date Effettive" popolate automaticamente. Aggiunto pulsante "Vai al Sito" nella sidebar per testare comodamente la navigazione pubblica.
 
 ---
 
