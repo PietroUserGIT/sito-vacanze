@@ -22,7 +22,8 @@ function PrenotaContent() {
         apartmentId: searchParams.get('property') || '',
         guests: '1',
         name: '',
-        email: ''
+        email: '',
+        guestNote: ''
     });
 
     useEffect(() => {
@@ -201,6 +202,7 @@ function PrenotaContent() {
             check_out: formData.checkOut,
             guest_name: formData.name,
             guest_email: formData.email,
+            guest_note: formData.guestNote,
             total_price: total_price,
             status: 'pending' // pending non blocca il calendario
         }]);
@@ -386,6 +388,18 @@ function PrenotaContent() {
                                 style={inputStyle}
                                 onChange={handleChange}
                                 value={formData.email}
+                            />
+
+                            <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem' }}>
+                                Note Aggiuntive (opzionale)
+                            </label>
+                            <textarea
+                                name="guestNote"
+                                placeholder="Eventuali richieste specifiche (es. orario di arrivo stimato, necessità particolari)..."
+                                maxLength={500}
+                                style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }}
+                                onChange={handleChange}
+                                value={formData.guestNote}
                             />
 
                             <button

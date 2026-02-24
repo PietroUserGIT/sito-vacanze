@@ -63,6 +63,7 @@ export default function SettingsPage() {
         { name: '{{payment_amount}}', desc: 'Importo da pagare (caparra o saldo)' },
         { name: '{{due_date}}', desc: 'Data di scadenza pagamento' },
         { name: '{{payment_link}}', desc: 'Link Stripe per il pagamento' },
+        { name: '{{guest_note}}', desc: 'Nota aggiunta dal cliente in fase di prenotazione' },
     ];
 
     if (loading) return <div>Caricamento in corso...</div>;

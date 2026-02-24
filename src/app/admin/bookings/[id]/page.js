@@ -151,6 +151,7 @@ export default function BookingDetail() {
 
         const replaceTags = (text, data) => {
             return text
+                .replace(/\\n/g, '\n') // Converte i "\n" testuali inseriti a mano o dal DB in veri a capo
                 .replace(/{{guest_name}}/g, data.guest_name)
                 .replace(/{{property_name}}/g, data.property_name)
                 .replace(/{{check_in}}/g, data.check_in)
@@ -158,7 +159,8 @@ export default function BookingDetail() {
                 .replace(/{{total_price}}/g, data.total_price)
                 .replace(/{{payment_amount}}/g, data.payment_amount)
                 .replace(/{{due_date}}/g, data.due_date)
-                .replace(/{{payment_link}}/g, data.payment_link);
+                .replace(/{{payment_link}}/g, data.payment_link)
+                .replace(/{{guest_note}}/g, data.guest_note);
         };
 
         bodyText = replaceTags(activeTemplate, {
@@ -169,10 +171,11 @@ export default function BookingDetail() {
             total_price: parseFloat(booking.total_price).toFixed(2),
             payment_amount: type === 'deposit' ? emailFormData.caparraAmount : emailFormData.saldoAmount,
             due_date: type === 'deposit' ? scadenzaCapArr : scadenzaSaldoArr,
-            payment_link: paymentLink
+            payment_link: paymentLink,
+            guest_note: booking.guest_note || 'Nessuna nota fornita'
         });
 
-        const body = encodeURIComponent(bodyText);
+        const body = encodeURIComponent(bodyText.replace(/\r?\n/g, '\r\n'));
         window.open(`mailto:${booking.guest_email}?subject=${subject}&body=${body}`, '_blank');
         setIsGenerating(false);
         setEmailModal({ isOpen: false, type: null });
@@ -256,6 +259,13 @@ export default function BookingDetail() {
                         <p><strong>Check-in:</strong> {new Date(booking.check_in).toLocaleDateString()}</p>
                         <p><strong>Check-out:</strong> {new Date(booking.check_out).toLocaleDateString()}</p>
                         <p><strong>Prezzo Totale:</strong> €{parseFloat(booking.total_price).toFixed(2)}</p>
+
+                        {booking.guest_note && (
+                            <div style={{ marginTop: '1rem', padding: '1rem', background: '#fffbeb', borderLeft: '4px solid #f59e0b', borderRadius: '0.25rem' }}>
+                                <strong>Nota Cliente:</strong>
+                                <p style={{ margin: '0.5rem 0 0 0', whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>{booking.guest_note}</p>
+                            </div>
+                        )}
 
                         <div style={{ marginTop: '2rem', padding: '1rem', background: '#f8fafc', borderRadius: '0.5rem', fontSize: '0.9rem', border: '1px solid var(--border)' }}>
                             <div style={{ marginBottom: '1rem' }}>
